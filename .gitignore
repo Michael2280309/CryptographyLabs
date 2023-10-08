@@ -1,3 +1,7 @@
+*
+!*.*
+!*/
+!Makefile
 *.exe
 *.o
 *.docx
