@@ -2,6 +2,18 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+/* Inverse Initial Permutation Table */
+static char PI[] = {
+    40,  8, 48, 16, 56, 24, 64, 32, 
+    39,  7, 47, 15, 55, 23, 63, 31, 
+    38,  6, 46, 14, 54, 22, 62, 30, 
+    37,  5, 45, 13, 53, 21, 61, 29, 
+    36,  4, 44, 12, 52, 20, 60, 28, 
+    35,  3, 43, 11, 51, 19, 59, 27, 
+    34,  2, 42, 10, 50, 18, 58, 26, 
+    33,  1, 41,  9, 49, 17, 57, 25
+};
+
  /* Post S-Box permutation */
 static char P[] = {
     16,  7, 20, 21, 
@@ -104,7 +116,7 @@ int32_t feistel(int32_t vec, int64_t key){
 	// E(R) expantion function
 	int64_t expanded = 0; // 48 bit
 	for(int i = 0; i < 48; i++){
-		int64_t bit = ((uint64_t)vec >> (feistel_expantion[i] - 1)) & 1; 
+		int64_t bit = (vec >> (feistel_expantion[i] - 1)) & 1; 
 		expanded |= bit << (47 - i);
 	}
 
@@ -124,7 +136,7 @@ int32_t feistel(int32_t vec, int64_t key){
 	// Post S-box permutation
 	int32_t permuted = 0;
 	for(int i = 0; i < 32; i++){
-		int32_t bit = (((uint32_t)transformed) >> (P[i] - 1)) & 1; 
+		int32_t bit = (transformed >> (P[i] - 1)) & 1; 
 		permuted |= bit << (31 - i);
 	}
 	return permuted;
@@ -149,7 +161,6 @@ int64_t generate_key(int64_t base_key, uint8_t iteration){ // iteration 1..16
 			else
 				cur |= 0x80;
 		}
-		
 		// set byte back
 		base_key = !(byte_mask << (i * 8)) & base_key | (((int64_t) cur & byte_mask) << (i * 8)); 
 	}
@@ -168,7 +179,7 @@ int64_t generate_key(int64_t base_key, uint8_t iteration){ // iteration 1..16
 	// getting the Citer, Diter vector
 	for(int i = 1; i <= iteration; i++){
 		// cyclic left shift
-		int shift_times = CD_shift_table[i];
+		int shift_times = CD_shift_table[i - 1];
 		int32_t C_saved_bits = C0_block >> (27 - shift_times + 1);
 		C0_block = (C0_block << shift_times) | C_saved_bits;
 		C0_block &= 0x0FFFFFFF; // clearing shifted bound
@@ -189,9 +200,44 @@ int64_t generate_key(int64_t base_key, uint8_t iteration){ // iteration 1..16
 	return key;
 }
 
+int64_t DES(int64_t block, int64_t* keys){
+	// Initial permutation
+	int64_t block_perm = initial_permutation(block);
+	int32_t L = block_perm >> 32;
+	int32_t R = block_perm;
+	int32_t old_R = 0, old_L = 0;
+
+	// 16 cycles of feistel transform
+	for(int i = 0; i < 16; i++){
+		old_L = L;
+		old_R = R;
+		L = old_R;
+		R = old_L ^ feistel(old_R, keys[i]);
+	}
+
+	// Final reverse permutation
+	int64_t RL_block = ((int64_t)R << 32) | ((int64_t)L & 0x00000000FFFFFFFF);
+	int64_t accumulator = 0;
+	for(int i = 0; i < 64; i++){
+		accumulator <<= 1;
+		accumulator |= (RL_block >> (PI[i] - 1)) & 1;
+	}
+	return accumulator;
+}
+
 int main(){
-	char block[8] = "hello_w";
-	char key[8] = "secret_";
-		
+	int64_t block = 0x0123456789ABCDEF;
+	int64_t initial_key = 0xABCDEFABCDEFABCD;
+	int64_t keys[16];
+
+	// Generating keys
+	for(int i = 1; i <= 16; i++){
+		keys[i - 1] = generate_key(initial_key, i);
+	}	
+
+	// Encryption
+	int64_t enc = DES(block, keys);
+	printf("enc: 0x%X\n", enc);
+
 	return 0;
 }
