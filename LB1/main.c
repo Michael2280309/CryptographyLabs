@@ -105,9 +105,9 @@ static char D0_table[28] = {63, 55, 47, 39, 31, 23, 15, 7, 62, 54, 46, 38, 30, 2
 
 int64_t initial_permutation(int64_t _64block){
 	int64_t accumulator = 0;
-	for(int i = 63; i >= 0; i--){
-		int64_t bit = (_64block >> (IP_table[abs(i - 63)] - 1)) & 1;
-		accumulator |= (bit << i);
+	for(int i = 0; i < 64; i++){
+		accumulator <<= 1;
+		accumulator |= (_64block >> (IP_table[i] - 1)) & 1;
 	}
 	return accumulator;
 }
@@ -116,8 +116,8 @@ int32_t feistel(int32_t vec, int64_t key){
 	// E(R) expantion function
 	int64_t expanded = 0; // 48 bit
 	for(int i = 0; i < 48; i++){
-		int64_t bit = (vec >> (feistel_expantion[i] - 1)) & 1; 
-		expanded |= bit << (47 - i);
+		expanded <<= 1;
+		expanded |= (vec >> (feistel_expantion[i] - 1)) & 1; 
 	}
 
 	// XOR it with key
@@ -136,8 +136,8 @@ int32_t feistel(int32_t vec, int64_t key){
 	// Post S-box permutation
 	int32_t permuted = 0;
 	for(int i = 0; i < 32; i++){
-		int32_t bit = (transformed >> (P[i] - 1)) & 1; 
-		permuted |= bit << (31 - i);
+		permuted <<= 1;
+		permuted |= (transformed >> (P[i] - 1)) & 1; 
 	}
 	return permuted;
 }
@@ -194,8 +194,9 @@ int64_t generate_key(int64_t base_key, uint8_t iteration){ // iteration 1..16
 	// key 48 bit
 	int64_t key = 0;
 	for(int i = 0; i < 48; i++){
-		int64_t bit = (CiDi >> (key_table[i] - 1)) & 1;		
-		key |= (bit << (47 - i));
+		key <<= 1;
+		key |= (CiDi >> (key_table[i] - 1)) & 1;		
+		//key |= (bit << (47 - i));
 	}
 	return key;
 }
@@ -237,7 +238,7 @@ int main(){
 
 	// Encryption
 	int64_t enc = DES(block, keys);
-	printf("enc: 0x%X\n", enc);
+	printf("enc: 0x%llX\n", enc);
 
 	return 0;
 }
