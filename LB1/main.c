@@ -254,8 +254,9 @@ long get_file_size(FILE* fp){
 }
 
 int main(){
-	int64_t block = 0xF123456789ABCDEF;
-	int64_t initial_key = 0xABCDEFABCDEFABCD;
+
+	int64_t initial_key = 0x0123456789ABCDEF;
+
 	FILE* fp_test1 = fopen("./test/test1.txt", "rb");
 	if(fp_test1)
 	{
@@ -288,13 +289,10 @@ int main(){
 			putc(buf[i], stdout);
 		}
 		putc('\n', stdout);
+
+		fclose(fp_test1);
+		free(buf);
 	}
-	// Encryption
-//	int64_t enc = DES(block, initial_key, 1);
-//	printf("enc: 0x%llX\n", enc);
-//
-//	// Decryption
-//	int64_t dec = DES(enc, initial_key, 0);
-//	printf("dec: 0x%llX\n", dec);
+
 	exit(0);
 }
