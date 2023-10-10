@@ -202,57 +202,99 @@ void generate_keys(int64_t base_key, int64_t* keys){
 	}
 }
 
-int64_t DES(int64_t block, int64_t key, int b_enc){
+void DES(int64_t* block, int64_t block_length, int64_t key, int b_enc){
 	int64_t keys[16];
 	// Generating keys
 	generate_keys(key, keys);
 
-	// Initial permutation
-	int64_t block_perm = initial_permutation(block);
-	int32_t L = block_perm >> 32;
-	int32_t R = block_perm;
-	int32_t old_R = 0, old_L = 0;
+	for(int k = 0; k < block_length; k++){
+		// Initial permutation
+		int64_t block_perm = initial_permutation(block[k]);
+		int32_t L = block_perm >> 32;
+		int32_t R = block_perm;
+		int32_t old_R = 0, old_L = 0;
 
-	// 16 cycles of feistel transform
-	for(int i = 0; i < 16; i++){
-		old_L = L;
-		old_R = R;
-		L = old_R;
-		if(b_enc)
-			R = old_L ^ feistel(old_R, keys[i]);
-		else
-			R = old_L ^ feistel(old_R, keys[15 - i]);
-	}
-	
-//	else{ // decryption
-//		for(int i = 15; i >= 0; i--){
-//			old_L = L;
-//			old_R = R;
-//			R = old_L;
-//			L = old_R ^ feistel(old_L, keys[i]);
-//		}
-//	}
+		// 16 cycles of feistel transform
+		for(int i = 0; i < 16; i++){
+			old_L = L;
+			old_R = R;
+			L = old_R;
+			if(b_enc)
+				R = old_L ^ feistel(old_R, keys[i]);
+			else
+				R = old_L ^ feistel(old_R, keys[15 - i]);
+		}
+		
+	//	else{ // decryption
+	//		for(int i = 15; i >= 0; i--){
+	//			old_L = L;
+	//			old_R = R;
+	//			R = old_L;
+	//			L = old_R ^ feistel(old_L, keys[i]);
+	//		}
+	//	}
 
-	// Final reverse permutation
-	int64_t RL_block = ((int64_t)R << 32) | ((int64_t)L & 0x00000000FFFFFFFF);
-	int64_t accumulator = 0;
-	for(int i = 0; i < 64; i++){
-		accumulator <<= 1;
-		accumulator |= (RL_block >> (64 - PI[i])) & LB64;
+		// Final reverse permutation
+		int64_t RL_block = ((int64_t)R << 32) | ((int64_t)L & 0x00000000FFFFFFFF);
+		int64_t accumulator = 0;
+		for(int i = 0; i < 64; i++){
+			accumulator <<= 1;
+			accumulator |= (RL_block >> (64 - PI[i])) & LB64;
+		}
+		block[k] = accumulator;
 	}
-	return accumulator;
+}
+
+long get_file_size(FILE* fp){
+	fseek(fp, 0, SEEK_SET);
+	fseek(fp, 0, SEEK_END);
+	long size = ftell(fp);
+	fseek(fp, 0, SEEK_SET);
+	return size;
 }
 
 int main(){
 	int64_t block = 0xF123456789ABCDEF;
 	int64_t initial_key = 0xABCDEFABCDEFABCD;
+	FILE* fp_test1 = fopen("./test/test1.txt", "rb");
+	if(fp_test1)
+	{
+		long size = get_file_size(fp_test1);
+		char* buf = (char*)malloc(size);
 		
-	// Encryption
-	int64_t enc = DES(block, initial_key, 1);
-	printf("enc: 0x%llX\n", enc);
+		fread(buf, size, 1, fp_test1);
 
-	// Decryption
-	int64_t dec = DES(enc, initial_key, 0);
-	printf("dec: 0x%llX\n", dec);
+		for(int i = 0; i < (size / 8) * 8; i++)
+		{
+			putc(buf[i], stdout);
+		}
+		putc('\n', stdout);
+		puts("-----------------------------------------");
+		int64_t* start = (int64_t*) buf;
+
+		// Cipher that text
+		DES(start, (size / 8), initial_key, 1);
+		for(int i = 0; i < (size / 8) * 8; i++)
+		{
+			putc(buf[i], stdout);
+		}
+		putc('\n', stdout);
+		puts("-----------------------------------------");
+
+		// Decrypt back
+		DES(start, (size / 8), initial_key, 0);
+		for(int i = 0; i < (size / 8) * 8; i++)
+		{
+			putc(buf[i], stdout);
+		}
+		putc('\n', stdout);
+	}
+	// Encryption
+//	int64_t enc = DES(block, initial_key, 1);
+//	printf("enc: 0x%llX\n", enc);
+//
+//	// Decryption
+//	int64_t dec = DES(enc, initial_key, 0);
+//	printf("dec: 0x%llX\n", dec);
 	exit(0);
 }
