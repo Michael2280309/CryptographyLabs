@@ -142,7 +142,7 @@ int32_t feistel(int32_t vec, int64_t key){
 	return permuted;
 }
 
-int64_t generate_key(int64_t base_key, uint8_t iteration){ // iteration 1..16
+void generate_keys(int64_t base_key, int64_t* keys){ // iteration 1..16
 	// Calculate number of odd bits so that we set the highest byte bit	
 	int64_t byte_mask = 0x00000000000000FF;
 	for(int i = 0; i < 8; i++){
@@ -169,17 +169,18 @@ int64_t generate_key(int64_t base_key, uint8_t iteration){ // iteration 1..16
 	int32_t C0_block = 0;
 	int32_t D0_block = 0;
 	for(int i = 0; i < 28; i++){
-		int64_t bit = (base_key >> (C0_table[i] - 1)) & 1;
-		C0_block |= (bit << (27 - i));
+		C0_block <<= 1;
+		C0_block |= (base_key >> (C0_table[i] - 1)) & 1;
 
-		bit = (base_key >> (D0_table[i] - 1)) & 1;
-		D0_block |= (bit << (27 - i));
+		D0_block <<= 1;
+		D0_block |= (base_key >> (D0_table[i] - 1)) & 1;
 	}	
 
 	// getting the Citer, Diter vector
-	for(int i = 1; i <= iteration; i++){
+	for(int i = 0; i < 16; i++){
 		// cyclic left shift
-		int shift_times = CD_shift_table[i - 1];
+		int shift_times = CD_shift_table[i];
+
 		int32_t C_saved_bits = C0_block >> (27 - shift_times + 1);
 		C0_block = (C0_block << shift_times) | C_saved_bits;
 		C0_block &= 0x0FFFFFFF; // clearing shifted bound
@@ -187,33 +188,46 @@ int64_t generate_key(int64_t base_key, uint8_t iteration){ // iteration 1..16
 		int32_t D_saved_bits = D0_block >> (27 - shift_times + 1);
 		D0_block = (D0_block << shift_times) | D_saved_bits;
 		D0_block &= 0x0FFFFFFF;
+
+		// creating common vector CiDi
+		int64_t CiDi = ((int64_t) C0_block << 27) | D0_block;
+		// key 48 bit
+		int64_t key = 0;
+		for(int j = 0; j < 48; j++){
+			key <<= 1;
+			key |= (CiDi >> (key_table[j] - 1)) & 1;		
+		}
+		keys[i] = key;
 	}
-	
-	// creating common vector CiDi
-	int64_t CiDi = ((int64_t) C0_block << 27) | D0_block;
-	// key 48 bit
-	int64_t key = 0;
-	for(int i = 0; i < 48; i++){
-		key <<= 1;
-		key |= (CiDi >> (key_table[i] - 1)) & 1;		
-		//key |= (bit << (47 - i));
-	}
-	return key;
 }
 
-int64_t DES(int64_t block, int64_t* keys){
+int64_t DES(int64_t block, int64_t key, int b_enc){
+	int64_t keys[16];
+	// Generating keys
+	generate_keys(key, keys);
+
 	// Initial permutation
 	int64_t block_perm = initial_permutation(block);
 	int32_t L = block_perm >> 32;
 	int32_t R = block_perm;
 	int32_t old_R = 0, old_L = 0;
 
-	// 16 cycles of feistel transform
-	for(int i = 0; i < 16; i++){
-		old_L = L;
-		old_R = R;
-		L = old_R;
-		R = old_L ^ feistel(old_R, keys[i]);
+	if(b_enc){
+		// 16 cycles of feistel transform
+		for(int i = 0; i < 16; i++){
+			old_L = L;
+			old_R = R;
+			L = old_R;
+			R = old_L ^ feistel(old_R, keys[i]);
+		}
+	}
+	else{ // decryption
+		for(int i = 0; i < 16; i++){
+			old_L = L;
+			old_R = R;
+			R = old_L;
+			L = old_R ^ feistel(old_L, keys[i]);
+		}
 	}
 
 	// Final reverse permutation
@@ -229,16 +243,13 @@ int64_t DES(int64_t block, int64_t* keys){
 int main(){
 	int64_t block = 0x0123456789ABCDEF;
 	int64_t initial_key = 0xABCDEFABCDEFABCD;
-	int64_t keys[16];
-
-	// Generating keys
-	for(int i = 1; i <= 16; i++){
-		keys[i - 1] = generate_key(initial_key, i);
-	}	
-
+		
 	// Encryption
-	int64_t enc = DES(block, keys);
+	int64_t enc = DES(block, initial_key, 1);
 	printf("enc: 0x%llX\n", enc);
 
-	return 0;
+	// Decryption
+	int64_t dec = DES(enc, initial_key, 0);
+	printf("dec: 0x%llX\n", dec);
+	exit(0);
 }
