@@ -202,7 +202,7 @@ void generate_keys(int64_t base_key, int64_t* keys){
 	}
 }
 
-void DES(int64_t* block, int64_t block_length, int64_t key, int b_enc){
+void DES(int64_t* block, int64_t block_length, int64_t key, int b_enc, int entrop_on){
 	int64_t keys[16];
 	// Generating keys
 	generate_keys(key, keys);
@@ -214,17 +214,55 @@ void DES(int64_t* block, int64_t block_length, int64_t key, int b_enc){
 		int32_t R = block_perm;
 		int32_t old_R = 0, old_L = 0;
 
+		if(b_enc && entrop_on)
+			printf("16 steps per block: ---------------------------------------------------------\n");
+
 		// 16 cycles of feistel transform
 		for(int i = 0; i < 16; i++){
 			old_L = L;
 			old_R = R;
 			L = old_R;
 			if(b_enc)
+			{
 				R = old_L ^ feistel(old_R, keys[i]);
+				if(entrop_on)
+				{
+					int64_t fullb = (((int64_t)L & 0x00000000FFFFFFFF) << 32) |
+						((int64_t)R & 0x00000000FFFFFFFF);
+//					float entrop[8];
+//					float avg = 0;
+					printf("Hex: %llx\n", fullb);
+					int ones_count = 0;
+					while(fullb)
+					{
+						ones_count++;
+						fullb &= (fullb - 1);
+					}
+					float entropy = (float) ones_count / 64.0f;
+					printf("Entropy = %f\n", entropy);
+//					putc('[', stdout);
+//					for(int j = 0; j < 8; j++)
+//					{
+//						char cur = fullb >> (8 * j);
+//						int ones_count = 0;
+//						while (cur){
+//							ones_count++;
+//							cur &= (cur - 1);
+//						}
+//						entrop[j] = (float) ones_count / 8.0f;
+//						avg += entrop[j];
+//						printf("%f,", entrop[j]);
+//					}
+//					avg /= 8;
+//					putc(']', stdout);
+//					printf(" Avg: %f\n", avg);
+				}
+			}
 			else
 				R = old_L ^ feistel(old_R, keys[15 - i]);
 		}
-		
+		if(entrop_on)
+			puts("");
 	//	else{ // decryption
 	//		for(int i = 15; i >= 0; i--){
 	//			old_L = L;
@@ -245,6 +283,18 @@ void DES(int64_t* block, int64_t block_length, int64_t key, int b_enc){
 	}
 }
 
+void weak_keys_check(){
+	int64_t wks[4] = {0x0101010101010101, 0xFEFEFEFEFEFEFEFE, 0x1F1F1F1F0E0E0E0E,0xE0E0E0E0F1F1F1F1};
+	for(int i = 0; i < 4; i++)
+	{
+		// слабкий ключ є таким, що: DES(DES(x)) = x
+		int64_t b = 0x1234567890ABCDEF;
+		int64_t b1 = b;
+		DES(&b1, 1, wks[i], 1, 0);
+		if(b == b1) printf("Weak key found: %llX\n", wks[i]);
+	}
+}
+
 long get_file_size(FILE* fp){
 	fseek(fp, 0, SEEK_SET);
 	fseek(fp, 0, SEEK_END);
@@ -254,8 +304,14 @@ long get_file_size(FILE* fp){
 }
 
 int main(){
+	char initial_key1[18] = {0};
+	printf("Enter key: ");
+	if(scanf("%s", initial_key1) > 0)
+	{
+		printf("key read successfully: %llx\n", *(int64_t*)initial_key1);
+	}
+	int64_t initial_key = *(int64_t*)initial_key1;
 
-	int64_t initial_key = 0x0123456789ABCDEF;
 
 	FILE* fp_test1 = fopen("./test/test1.txt", "rb");
 	if(fp_test1)
@@ -274,7 +330,7 @@ int main(){
 		int64_t* start = (int64_t*) buf;
 
 		// Cipher that text
-		DES(start, (size / 8), initial_key, 1);
+		DES(start, (size / 8), initial_key, 1, 1);
 		for(int i = 0; i < (size / 8) * 8; i++)
 		{
 			putc(buf[i], stdout);
@@ -283,7 +339,7 @@ int main(){
 		puts("-----------------------------------------");
 
 		// Decrypt back
-		DES(start, (size / 8), initial_key, 0);
+		DES(start, (size / 8), initial_key, 0, 0);
 		for(int i = 0; i < (size / 8) * 8; i++)
 		{
 			putc(buf[i], stdout);
@@ -293,6 +349,8 @@ int main(){
 		fclose(fp_test1);
 		free(buf);
 	}
+	printf("WEAK KEYS TESTING\n");
+	weak_keys_check();
 
 	exit(0);
 }
