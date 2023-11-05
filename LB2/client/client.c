@@ -14,6 +14,7 @@
 typedef enum {false, true} bool;
 
 int main (void) {
+	srand(time(0));
     const int conn = connect_net("127.0.0.1:8080");
     if (conn < 0) {
         fprintf(stderr, "Error: connect_net\n");

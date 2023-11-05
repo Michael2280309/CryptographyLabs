@@ -9,6 +9,7 @@
 typedef enum {false, true} bool;
 
 int main (void) {
+	srand(time(0) + 1);
     int listener = listen_net("127.0.0.1:8080");
 	if(listener < 0)
 	{
