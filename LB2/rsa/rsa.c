@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #define LZ64 0x00000000FFFFFFFF
-#define die() ((rand() % (32768 - 7)) + 7)
+#include "rsa.h"
 
 uint64_t rsa_prime();
 int rsa_miller_rabin_test(uint64_t n, int k);

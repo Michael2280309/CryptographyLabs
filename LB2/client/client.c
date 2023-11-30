@@ -9,6 +9,7 @@
 #include <netinet/in.h>
 #include "../rsa/rsa.h"
 #include "../net/net.h"
+#include <time.h>
 #define BUFF 512
 
 typedef enum {false, true} bool;
